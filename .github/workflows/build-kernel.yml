@@ -71,7 +71,7 @@ jobs:
         cd /workdir/linux-socfpga/arch/arm/boot
         rm -rf !(zImage)
         
-    - name: Upload img directory
+    - name: Upload zImage directory
       uses: actions/upload-artifact@main
       with:
         name: zImage${{ env.FILE_DATE }}
