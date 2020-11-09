@@ -64,15 +64,13 @@ jobs:
       
     - name: Compile
       run: |
-        cd /workdir
+        cd /workdir/linux-socfpga
         export CROSS_COMPILE=/workdir/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/arm-linux-gnueabihf-
         make ARCH=arm LOCALVERSION= zImage
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
-        cd /workdir/linux-socfpga/arch/arm/boot
-        rm -rf !(zImage)
         
     - name: Upload zImage directory
       uses: actions/upload-artifact@main
       with:
         name: zImage${{ env.FILE_DATE }}
-        path: /workdir/linux-socfpga/arch/arm/boot
+        path: /workdir/linux-socfpga/arch/arm/boot/zImage
