@@ -1,0 +1,78 @@
+#=================================================
+# Author: Liuhang
+#=================================================
+
+name: Build Kernel
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'
+#  schedule:
+#    - cron: 0 8 * * 5
+
+env:
+  REPO_URL: https://github.com/terasic/linux-socfpga
+  REPO_BRANCH: socfpga-4.5
+  CONFIG_FILE: .config
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+    
+    - name: Initialization environment
+      env: 
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+            sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+            sudo -E apt-get -qq update
+            sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-1804)
+            sudo -E apt-get -qq install bc
+            sudo -E apt-get -qq autoremove --purge
+            sudo -E apt-get -qq clean
+            sudo timedatectl set-timezone "$TZ"
+            sudo mkdir -p /workdir
+            sudo chown $USER:$GROUPS /workdir
+            
+    - name: Clone source code
+      working-directory: /workdir
+      run: |
+        df -hT $PWD
+        git clone $REPO_URL -b $REPO_BRANCH linux-socfpga
+        wget https://releases.linaro.org/archive/14.09/components/toolchain/binaries/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz
+        tar -xvf gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux.tar.xz
+        
+    - name: Load custom configuration
+      run: |
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE /workdir/linux-socfpga/.config
+        
+    - name: SSH connection to Actions
+      uses: P3TERX/ssh2actions@v1.0.0
+      if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
+      env:
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      
+    - name: Compile
+      run: |
+        cd /workdir
+        export CROSS_COMPILE=/workdir/gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux/bin/arm-linux-gnueabihf-
+        make ARCH=arm LOCALVERSION= zImage
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+        cd /workdir/linux-socfpga/arch/arm/boot
+        rm -rf !(zImage)
+        
+    - name: Upload img directory
+      uses: actions/upload-artifact@main
+      with:
+        name: zImage${{ env.FILE_DATE }}
+        path: /workdir/linux-socfpga/arch/arm/boot
